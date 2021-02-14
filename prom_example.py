@@ -1,19 +1,43 @@
-from prometheus_client import start_http_server, Summary
+#!/usr/bin/env python
+from prometheus_client import Gauge, start_http_server, Summary
 import random
 import time
+import re
+
+from CO2Meter import *
 
 # Create a metric to track time spent and requests made.
 REQUEST_TIME = Summary('request_processing_seconds', 'Time spent processing request')
+CO2_TEMP = Gauge('co2_temp', 'Temperature in celsius provided by co2 monitor')
+CO2_PPM = Gauge('co2_ppm', 'co2 part per million provided by co2 monitor')   
 
-# Decorate function with metric.
-@REQUEST_TIME.time()
-def process_request(t):
-    """A dummy function that takes some time."""
-    time.sleep(t)
+Meter = CO2Meter("/dev/hidraw0")
 
-if __name__ == '__main__':
-    # Start up the server to expose the metrics.
+def read_sensor_co2():
+    co2 = Meter.get_co2()
+    co2 = co2.get('co2')
+    
+    if co2 is None:
+        return
+
+    CO2_PPM.set(co2)
+
+def read_sensor_temp():
+    temp = Meter.get_temperature()
+    temp = temp.get('temperature')
+    
+    if temp is None:
+        return
+
+    CO2_TEMP.set(temp)
+
+
+def main():
     start_http_server(8001)
-    # Generate some requests.
+
     while True:
-        process_request(random.random())
+        read_sensor_co2()
+        read_sensor_temp()
+        time.sleep(5)
+
+main()
